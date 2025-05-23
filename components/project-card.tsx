@@ -30,6 +30,18 @@ export function ProjectCard({
   const [hiddenCount, setHiddenCount] = useState(0);
   // State to track if tags list is expanded into a scrollable row
   const [expanded, setExpanded] = useState(false);
+  // Ref for the scrollable tags container
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Handle wheel events for horizontal scrolling of tags
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }
+  };
+  // Determine number of tags to show in collapsed state, reserving one slot for the '+X more' badge if there are hidden tags
+  const actualVisibleCount =
+    !expanded && hiddenCount > 0 ? Math.max(visibleCount - 1, 0) : visibleCount;
 
   // Calculate how many tags fit in one line and the remaining hidden count
   useEffect(() => {
@@ -83,82 +95,18 @@ export function ProjectCard({
               alt={title}
               width={600}
               height={400}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+              className="h-full w-full object-cover transition-transform duration-500 "
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f1a] via-transparent to-transparent"></div>
           </div>
 
-          <div className="relative z-10 space-y-3 p-4">
+          <div className="relative z-10 space-y-3 p-4" onWheel={handleWheel}>
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-bold text-white">{title}</h3>
               <div className="h-2 w-2 rounded-full bg-[#3ecef7] shadow-[0_0_8px_rgba(62,206,247,0.8)]"></div>
             </div>
 
             <p className="text-gray-400">{description}</p>
-
-            {/* Tags container with collapse/expand logic */}
-            <div className="relative">
-              {!expanded ? (
-                <div className="flex flex-wrap gap-2 relative">
-                  {/* Invisible measurer to detect wrap */}
-                  <div
-                    ref={measurerRef}
-                    className="absolute top-0 left-0 right-0 invisible flex flex-wrap gap-2"
-                  >
-                    {tags.map((tag) => (
-                      <Badge
-                        key={tag}
-                        variant="outline"
-                        className="border-[#3ecef7]/30 bg-[#0a0a12]/80 text-[#3ecef7] backdrop-blur-sm"
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                  {/* Visible tags */}
-                  {tags.slice(0, visibleCount).map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant="outline"
-                      className="border-[#3ecef7]/30 bg-[#0a0a12]/80 text-[#3ecef7] backdrop-blur-sm"
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                  {/* Show '+x more' badge clickable */}
-                  {hiddenCount > 0 && (
-                    <Badge
-                      onClick={() => setExpanded(true)}
-                      className="cursor-pointer border-[#3ecef7]/30 bg-[#0a0a12]/80 text-[#3ecef7] backdrop-blur-sm"
-                      variant="outline"
-                    >
-                      +{hiddenCount} more
-                    </Badge>
-                  )}
-                </div>
-              ) : (
-                <div className="flex overflow-x-auto gap-2 pb-2">
-                  {tags.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant="outline"
-                      className="border-[#3ecef7]/30 bg-[#0a0a12]/80 text-[#3ecef7] backdrop-blur-sm"
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                  {/* Collapse badge to revert back to one-line view */}
-                  <Badge
-                    onClick={() => setExpanded(false)}
-                    className="cursor-pointer border-[#3ecef7]/30 bg-[#0a0a12]/80 text-[#3ecef7] backdrop-blur-sm"
-                    variant="outline"
-                  >
-                    Show less
-                  </Badge>
-                </div>
-              )}
-            </div>
-
             <div className="pt-2">
               <Link
                 href={ctaUrl || "#"}
@@ -182,15 +130,87 @@ export function ProjectCard({
                 </svg>
               </Link>
             </div>
-          </div>
 
-          {isHovered && (
-            <div className="absolute bottom-0 left-0 h-0.5 w-full overflow-hidden">
-              <div className="animate-progress h-full w-full bg-gradient-to-r from-[#3ecef7] to-[#7deb7d]"></div>
+            {/* Tags container with collapse/expand logic */}
+            <div className="relative">
+              {!expanded ? (
+                <div className="flex gap-2 relative overflow-hidden">
+                  {/* Invisible measurer to detect wrap */}
+                  <div
+                    ref={measurerRef}
+                    className="absolute top-0 left-0 right-0 invisible flex flex-wrap gap-2"
+                  >
+                    {tags.map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className="border-[#3ecef7]/30 bg-[#0a0a12]/80 text-[#3ecef7] backdrop-blur-sm whitespace-nowrap"
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                  {/* Visible tags */}
+                  {tags.slice(0, actualVisibleCount).map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      className="border-[#3ecef7]/30 bg-[#0a0a12]/80 text-[#3ecef7] backdrop-blur-sm whitespace-nowrap"
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                  {/* Show '+x more' badge clickable */}
+                  {hiddenCount > 0 && (
+                    <Badge
+                      onClick={() => setExpanded(true)}
+                      variant="outline"
+                      className="cursor-pointer border-[#3ecef7]/30 bg-[#0a0a12]/80 text-[#3ecef7] backdrop-blur-sm animate-pulse whitespace-nowrap"
+                    >
+                      +{hiddenCount} more
+                    </Badge>
+                  )}
+                </div>
+              ) : (
+                <div
+                  ref={scrollContainerRef}
+                  className="flex overflow-x-auto gap-2 items-center project-scroll scrollbar-thin scrollbar-thumb-[#3ecef7] scrollbar-track-[#0f0f1a]"
+                >
+                  {tags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      className="border-[#3ecef7]/30 bg-[#0a0a12]/80 text-[#3ecef7] backdrop-blur-sm whitespace-nowrap"
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                  {/* Collapse badge to revert back to one-line view */}
+                  <Badge
+                    onClick={() => setExpanded(false)}
+                    className="cursor-pointer border-[#3ecef7]/30 bg-[#0a0a12]/80 text-[#3ecef7] backdrop-blur-sm whitespace-nowrap"
+                    variant="outline"
+                  >
+                    Show less
+                  </Badge>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </Card>
+      <style jsx>{`
+        .project-scroll::-webkit-scrollbar {
+          height: 4px;
+        }
+        .project-scroll::-webkit-scrollbar-track {
+          background: #0f0f1a;
+        }
+        .project-scroll::-webkit-scrollbar-thumb {
+          background: #3ecef7;
+          border-radius: 2px;
+        }
+      `}</style>
     </motion.div>
   );
 }
