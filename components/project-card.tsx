@@ -43,35 +43,35 @@ export function ProjectCard({
   const actualVisibleCount =
     !expanded && hiddenCount > 0 ? Math.max(visibleCount - 1, 0) : visibleCount;
 
-  // Calculate how many tags fit in one line and the remaining hidden count
+  // Calculate how many tags fit in one line and the remaining hidden count, only updating state on change
   useEffect(() => {
     const calculateVisibleCount = () => {
       const measurer = measurerRef.current;
       if (!measurer) return;
       const children = Array.from(measurer.children) as HTMLElement[];
       if (children.length === 0) {
-        setVisibleCount(0);
-        setHiddenCount(0);
+        if (visibleCount !== 0) setVisibleCount(0);
+        if (hiddenCount !== 0) setHiddenCount(0);
         return;
       }
       // Determine y-position of first line of tags
       const firstTop = children[0].getBoundingClientRect().top;
       let count = 0;
       for (const child of children) {
-        // Tags that share the same top value belong to the first line
         if (Math.abs(child.getBoundingClientRect().top - firstTop) < 1) {
           count++;
         }
       }
-      setVisibleCount(count);
-      setHiddenCount(tags.length - count);
+      const newVisible = count;
+      const newHidden = tags.length - count;
+      if (newVisible !== visibleCount) setVisibleCount(newVisible);
+      if (newHidden !== hiddenCount) setHiddenCount(newHidden);
     };
 
-    // Initial calculation and recalc on window resize
     calculateVisibleCount();
     window.addEventListener("resize", calculateVisibleCount);
     return () => window.removeEventListener("resize", calculateVisibleCount);
-  }, [tags, expanded]);
+  }, [expanded, tags.length]);
 
   return (
     <motion.div
