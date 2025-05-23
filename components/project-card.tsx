@@ -207,7 +207,8 @@ export function ProjectCard({
           background: #0f0f1a;
         }
         .project-scroll::-webkit-scrollbar-thumb {
-          background: #3ecef7;
+          /* Blue-green gradient thumb */
+          background: linear-gradient(to right, #3ecef7, #7deb7d);
           border-radius: 2px;
         }
       `}</style>

@@ -359,10 +359,18 @@ export default function Home() {
             </motion.div>
             <motion.div variants={itemVariants}>
               <ProjectCard
-                title="HealthTech AI Platform"
-                description="An AI-powered platform for healthcare providers to analyze patient data and improve care outcomes."
-                tags={["AI", "Healthcare", "React", "Python"]}
-                imageUrl="/placeholder.svg?height=400&width=600"
+                title="Eco-Friendly Cleaning Website"
+                description="Landing page for an eco-friendly residential cleaning website offering move-in/move-out and post-construction cleans with a 100% satisfaction guarantee."
+                tags={[
+                  "Next.js 15 (App Router)",
+                  "React 18",
+                  "TypeScript",
+                  "Node.js v18+",
+                  "Formspree",
+                  "Vercel",
+                ]}
+                imageUrl="/images/just-logo.png"
+                ctaUrl="https://cleaningservice-phi.vercel.app/"
               />
             </motion.div>
             <motion.div variants={itemVariants}>
