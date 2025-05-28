@@ -1,22 +1,37 @@
-import type { ReactNode } from "react";
-import "@/app/globals.css";
+import type React from "react";
 import type { Metadata } from "next";
-import ClientLayout from "@/components/ClientLayout";
-import { inter } from "@/app/fonts";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { Toaster } from "react-hot-toast";
+
+const inter = Inter({ subsets: ["latin"] });
 
 // SEO metadata for Next.js
 export const metadata: Metadata = {
-  title: "Zoftware Development - Anything is possible with Zoftware",
-  description: "If you can imagine it, we can build it.",
+  title: "HOB Studio - Haus of Banstead Interior Design",
+  description: "Where architectural precision meets artistic vision. Crafting spaces that transcend the ordinary.",
+  keywords: "interior design, luxury interiors, home design, commercial design, Banstead, HOB Studio",
   generator: "v0.dev",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      {/* Apply only the clear font (Inter) globally */}
-      <body className={inter.className}>
-        <ClientLayout>{children}</ClientLayout>
+    <html lang="en" className="scroll-smooth">
+      <body className={`${inter.className}`}>
+      
+            {children}
+      
+          {/* Place the Toaster at the root so any page or component can toast */}
+          <Toaster
+            position="bottom-right"
+            toastOptions={{
+              style: {
+                background: "#333",
+                color: "#fff",
+              },
+            }}
+          />
+       
       </body>
     </html>
   );

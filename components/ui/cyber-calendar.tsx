@@ -1,4 +1,6 @@
-import { useState } from "react";
+"use client";  // mark this module as a client component
+
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Clock, CalendarIcon } from "lucide-react";
 
@@ -69,16 +71,60 @@ const generateTimeSlots = (): { hours: number; minutes: number }[] => {
   return slots;
 };
 
+/**
+ * Hook to return today's Date and auto-update at local midnight daily.
+ */
+function useLocalToday(): Date {
+  // Initialize with current local time
+  const [today, setToday] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    // Compute ms until next local midnight
+    const now = new Date();
+    const nextMidnight = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+      0, 0, 0
+    );
+    const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+
+    // Schedule a one-time update at next midnight
+    const timeoutId = setTimeout(() => {
+      // Bump today to new date
+      setToday(new Date());
+      // Then schedule daily updates every 24h
+      setInterval(() => setToday(new Date()), 24 * 60 * 60 * 1000);
+      // (optionally clean up this interval on unmount)
+    }, msUntilMidnight);
+
+    // Clear the timeout if the component unmounts
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  return today;
+}
+
 export function CyberCalendar() {
-  const today = new Date();
+  // Get the current 'today' date in local time, auto-refreshing at midnight
+  const today = useLocalToday();
+
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  // If date crosses month/year boundary, update the calendar view automatically
+  useEffect(() => {
+    setCurrentMonth(today.getMonth());
+    setCurrentYear(today.getFullYear());
+  }, [today]);
+
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<{
     hours: number;
     minutes: number;
   } | null>(null);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
+  const [name, setName] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
 
   // Get days in month
   const getDaysInMonth = (month: number, year: number): number => {
@@ -143,12 +189,10 @@ export function CyberCalendar() {
 
   // Check if a date is today
   const isToday = (day: number): boolean => {
-    const checkDate = new Date(currentYear, currentMonth, day);
-    const today = new Date();
     return (
-      checkDate.getDate() === today.getDate() &&
-      checkDate.getMonth() === today.getMonth() &&
-      checkDate.getFullYear() === today.getFullYear()
+      day === today.getDate() &&
+      currentMonth === today.getMonth() &&
+      currentYear === today.getFullYear()
     );
   };
 
@@ -229,13 +273,12 @@ export function CyberCalendar() {
               {day !== null ? (
                 <button
                   onClick={() => handleDateSelect(day)}
-                  className={`relative w-full h-full flex items-center justify-center text-sm rounded-md transition-all ${
-                    isSelected(day)
-                      ? "bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black font-medium shadow-[0_0_15px_rgba(62,206,247,0.5)]"
-                      : isToday(day)
+                  className={`relative w-full h-full flex items-center justify-center text-sm rounded-md transition-all ${isSelected(day)
+                    ? "bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black font-medium shadow-[0_0_15px_rgba(62,206,247,0.5)]"
+                    : isToday(day)
                       ? "bg-[#1a1a2e] text-white border border-[#3ecef7] shadow-[0_0_8px_rgba(62,206,247,0.3)]"
                       : "bg-[#0f0f1a] text-gray-300 border border-[#1a1a2e] hover:border-[#3ecef7]/50 hover:bg-[#0a0a12]/80"
-                  }`}
+                    }`}
                 >
                   {day}
                 </button>
@@ -297,13 +340,12 @@ export function CyberCalendar() {
                 <button
                   key={index}
                   onClick={() => handleTimeSelect(slot.hours, slot.minutes)}
-                  className={`${
-                    selectedTime &&
+                  className={`${selectedTime &&
                     selectedTime.hours === slot.hours &&
                     selectedTime.minutes === slot.minutes
-                      ? "bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black"
-                      : "bg-[#1a1a2e] text-white hover:bg-[#252542]"
-                  } py-2 px-4 rounded-md transition-colors`}
+                    ? "bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black"
+                    : "bg-[#1a1a2e] text-white hover:bg-[#252542]"
+                    } py-2 px-4 rounded-md transition-colors`}
                 >
                   {formatTime(slot.hours, slot.minutes)}
                 </button>
@@ -321,6 +363,23 @@ export function CyberCalendar() {
             exit={{ opacity: 0, y: 10 }}
             className="mt-4"
           >
+            {/* Name and Email inputs for submission */}
+            <div className="flex flex-col space-y-3 mb-4">
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your Name"
+                className="w-full p-2 rounded bg-[#1a1a2e] border border-[#3ecef7] text-white"
+              />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Your Email"
+                className="w-full p-2 rounded bg-[#1a1a2e] border border-[#3ecef7] text-white"
+              />
+            </div>
             <button className="w-full py-3 px-4 rounded-md bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black font-medium shadow-[0_0_15px_rgba(62,206,247,0.3)] hover:shadow-[0_0_20px_rgba(62,206,247,0.5)] transition-all">
               Confirm Appointment
             </button>

@@ -139,9 +139,8 @@ export default function Home() {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.8, type: "spring" }}
               style={{
-                transform: `perspective(1000px) rotateX(${
-                  mouseAngle.y
-                }deg) rotateY(${-mouseAngle.x}deg)`,
+                transform: `perspective(1000px) rotateX(${mouseAngle.y
+                  }deg) rotateY(${-mouseAngle.x}deg)`,
                 transformStyle: "preserve-3d",
               }}
               className="relative w-48 md:w-64"
@@ -246,38 +245,44 @@ export default function Home() {
                 color="cyan"
               />
             </motion.div>
-            <motion.div variants={itemVariants}>
+            {/* <motion.div variants={itemVariants}>
               <CyberCard
                 icon={<Smartphone className="h-8 w-8" />}
                 title="Mobile Development"
                 description="Native and cross-platform mobile applications for iOS and Android."
                 color="green"
               />
-            </motion.div>
-            <motion.div variants={itemVariants}>
+            </motion.div> */}
+            <motion.div variants={itemVariants} className="relative">
               <CyberCard
                 icon={<Brain className="h-8 w-8" />}
                 title="AI Solutions"
                 description="Intelligent applications powered by machine learning and artificial intelligence."
                 color="cyan"
               />
+              <span className="absolute top-4 right-4 bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black text-xs font-semibold uppercase px-2 py-0.5 rounded">
+                Coming Soon
+              </span>
             </motion.div>
-            <motion.div variants={itemVariants}>
+            <motion.div variants={itemVariants} className="relative">
               <CyberCard
                 icon={<Database className="h-8 w-8" />}
                 title="Database Design"
                 description="Scalable and efficient database architectures for your applications."
                 color="green"
               />
+              <span className="absolute top-4 right-4 bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black text-xs font-semibold uppercase px-2 py-0.5 rounded">
+                Coming Soon
+              </span>
             </motion.div>
-            <motion.div variants={itemVariants}>
+            {/* <motion.div variants={itemVariants}>
               <CyberCard
                 icon={<Code className="h-8 w-8" />}
                 title="Custom Software"
                 description="Bespoke software solutions tailored to your specific business needs."
                 color="cyan"
               />
-            </motion.div>
+            </motion.div> */}
 
             {/* <motion.div variants={itemVariants}>
               <CyberCard
@@ -373,46 +378,6 @@ export default function Home() {
                 ctaUrl="https://cleaningservice-phi.vercel.app/"
               />
             </motion.div>
-            <motion.div variants={itemVariants}>
-              <ProjectCard
-                title="E-commerce Mobile App"
-                description="A feature-rich mobile shopping application with personalized recommendations and secure payments."
-                tags={["Mobile", "React Native", "Node.js"]}
-                imageUrl="/placeholder.svg?height=400&width=600"
-              />
-            </motion.div>
-            <motion.div variants={itemVariants}>
-              <ProjectCard
-                title="Smart City Dashboard"
-                description="Real-time monitoring dashboard for city infrastructure with IoT integration and data visualization."
-                tags={["IoT", "Dashboard", "Next.js"]}
-                imageUrl="/placeholder.svg?height=400&width=600"
-              />
-            </motion.div>
-            <motion.div variants={itemVariants}>
-              <ProjectCard
-                title="Financial Analytics Tool"
-                description="Advanced analytics platform for financial institutions to process and visualize complex data sets."
-                tags={["Finance", "Data", "Vue.js", "Python"]}
-                imageUrl="/placeholder.svg?height=400&width=600"
-              />
-            </motion.div>
-            <motion.div variants={itemVariants}>
-              <ProjectCard
-                title="Logistics Management System"
-                description="End-to-end logistics platform with route optimization and real-time tracking capabilities."
-                tags={["Logistics", "Maps API", "React", "Node.js"]}
-                imageUrl="/placeholder.svg?height=400&width=600"
-              />
-            </motion.div>
-            <motion.div variants={itemVariants}>
-              <ProjectCard
-                title="Educational Learning Platform"
-                description="Interactive e-learning platform with progress tracking and personalized learning paths."
-                tags={["Education", "Angular", "Firebase"]}
-                imageUrl="/placeholder.svg?height=400&width=600"
-              />
-            </motion.div>
           </motion.div>
 
           <motion.div variants={itemVariants} className="flex justify-center">
@@ -444,9 +409,7 @@ export default function Home() {
                   Us
                 </span>
               </h2>
-              <p className="mx-auto max-w-[700px] text-gray-400 md:text-xl">
-                Get in touch with our team to discuss your project requirements
-              </p>
+      
             </div>
           </motion.div>
 
@@ -536,7 +499,7 @@ export default function Home() {
                 <div className="space-y-1">
                   <h3 className="text-xl font-bold text-white">Address</h3>
                   <p className="text-gray-300">
-                    Toronto, ON (Remote work accepted!)
+                    Remote work accepted {':)'}
                   </p>
                 </div>
               </div>
