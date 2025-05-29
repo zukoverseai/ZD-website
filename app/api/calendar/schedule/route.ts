@@ -68,7 +68,10 @@ export async function POST(req: Request) {
       calendarId: process.env.CALENDAR_ID!,
       requestBody: {
         summary,
-        description: summary,
+        // Include booker info in description for easy identification
+        description: `${summary}\n\nBooked by: ${
+          attendees?.[0]?.displayName || ""
+        } <${attendees?.[0]?.email || ""}>`,
         start: { dateTime: startDate.toISOString() },
         end: { dateTime: endDate.toISOString() },
       },
