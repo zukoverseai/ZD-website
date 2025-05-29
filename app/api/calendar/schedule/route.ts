@@ -92,12 +92,14 @@ export async function POST(req: Request) {
   // Extract created event
   const event = insertResponse.data;
 
-  // Configure SendGrid client
+  // Configure SendGrid client (email sending commented out; emails will be sent manually)
+  /*
   const { SENDGRID_API_KEY, SENDGRID_FROM } = process.env;
   if (!SENDGRID_API_KEY || !SENDGRID_FROM) {
     throw new Error("Missing SENDGRID_API_KEY or SENDGRID_FROM in environment");
   }
   sgMail.setApiKey(SENDGRID_API_KEY);
+  */
 
   // Helper to format dates in ICS format: YYYYMMDDTHHMMSSZ
   function toICSDate(date: Date) {
@@ -125,7 +127,8 @@ export async function POST(req: Request) {
   // Join lines with CRLF as per RFC5545
   const icsContent = icsLines.join("\r\n");
 
-  // Send confirmation email with ICS attachment if an attendee exists
+  // Send confirmation email with ICS attachment if an attendee exists (commented out; send manually)
+  /*
   const recipient =
     attendees && attendees.length > 0 ? attendees[0].email : null;
   if (recipient) {
@@ -134,9 +137,7 @@ export async function POST(req: Request) {
         from: SENDGRID_FROM,
         to: recipient,
         subject: "Your Appointment is Confirmed",
-        text: `Hi ${
-          attendees[0].displayName || ""
-        },\n\nYour appointment "${summary}" is confirmed for ${startDate.toLocaleString()}.\n\nPlease find the attached ICS file to add it to your calendar.\n\nThank you!`,
+        text: `Hi ${attendees[0].displayName || ""},\n\nYour appointment "${summary}" is confirmed for ${startDate.toLocaleString()}.\n\nPlease find the attached ICS file to add it to your calendar.\n\nThank you!`,
         attachments: [
           {
             content: Buffer.from(icsContent).toString("base64"),
@@ -151,6 +152,7 @@ export async function POST(req: Request) {
       console.error("Error sending confirmation email via SendGrid:", emailErr);
     }
   }
+  */
 
   // Respond with JSON indicating success and include the event for the UI
   return NextResponse.json({ event, status: "scheduled" });
