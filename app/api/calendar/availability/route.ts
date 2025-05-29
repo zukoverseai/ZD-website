@@ -22,13 +22,16 @@ export async function GET(req: Request) {
     client_email: string;
     private_key: string;
   };
+  // Log which service account email we're using for availability queries
+  console.log("Using Service Account Email:", keyObj.client_email);
 
   // Authenticate with Google using JWT service account
   const client = new google.auth.JWT(
     keyObj.client_email,
     undefined,
     keyObj.private_key,
-    ["https://www.googleapis.com/auth/calendar"]
+    ["https://www.googleapis.com/auth/calendar"],
+    "support@zukoverse.ai"
   );
   await client.authorize();
   const calendar = google.calendar({ version: "v3", auth: client });

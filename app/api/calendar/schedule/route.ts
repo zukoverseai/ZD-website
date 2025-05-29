@@ -39,13 +39,16 @@ export async function POST(req: Request) {
     client_email: string;
     private_key: string;
   };
+  // Log which service account email we're using
+  console.log("Using Service Account Email:", keyObj.client_email);
 
   // Create JWT auth client for Google API
   const client = new google.auth.JWT(
     keyObj.client_email,
     undefined,
     keyObj.private_key,
-    ["https://www.googleapis.com/auth/calendar"]
+    ["https://www.googleapis.com/auth/calendar"],
+    "support@zukoverse.ai"
   );
   // Authorize client
   await client.authorize();
@@ -53,15 +56,36 @@ export async function POST(req: Request) {
   const calendar = google.calendar({ version: "v3", auth: client });
 
   // Insert event into calendar (no attendees => no invite emails)
-  const insertResponse = await calendar.events.insert({
-    calendarId: process.env.CALENDAR_ID!,
-    requestBody: {
-      summary,
-      description: summary,
-      start: { dateTime: startDate.toISOString() },
-      end: { dateTime: endDate.toISOString() },
-    },
+  console.log("Scheduling event to Google Calendar:", {
+    calendarId: process.env.CALENDAR_ID,
+    summary,
+    start: startDate.toISOString(),
+    end: endDate.toISOString(),
   });
+  let insertResponse;
+  try {
+    insertResponse = await calendar.events.insert({
+      calendarId: process.env.CALENDAR_ID!,
+      requestBody: {
+        summary,
+        description: summary,
+        start: { dateTime: startDate.toISOString() },
+        end: { dateTime: endDate.toISOString() },
+      },
+    });
+    console.log("Google Calendar insertResponse.data:", insertResponse.data);
+  } catch (err: any) {
+    console.error("Error inserting event into Google Calendar:", err);
+    // Log detailed request and response info for debugging
+    if (err.config) {
+      console.error("Google API request config:", err.config);
+    }
+    if (err.response) {
+      console.error("Google API response status:", err.response.status);
+      console.error("Google API response data:", err.response.data);
+    }
+    throw err;
+  }
   // Extract created event
   const event = insertResponse.data;
 
@@ -102,24 +126,29 @@ export async function POST(req: Request) {
   const recipient =
     attendees && attendees.length > 0 ? attendees[0].email : null;
   if (recipient) {
-    await sgMail.send({
-      from: SENDGRID_FROM,
-      to: recipient,
-      subject: "Your Appointment is Confirmed",
-      text: `Hi ${
-        attendees[0].displayName || ""
-      },\n\nYour appointment "${summary}" is confirmed for ${startDate.toLocaleString()}.\n\nPlease find the attached ICS file to add it to your calendar.\n\nThank you!`,
-      attachments: [
-        {
-          content: Buffer.from(icsContent).toString("base64"),
-          filename: "event.ics",
-          type: "text/calendar; method=PUBLISH",
-          disposition: "attachment",
-        },
-      ],
-    });
+    try {
+      await sgMail.send({
+        from: SENDGRID_FROM,
+        to: recipient,
+        subject: "Your Appointment is Confirmed",
+        text: `Hi ${
+          attendees[0].displayName || ""
+        },\n\nYour appointment "${summary}" is confirmed for ${startDate.toLocaleString()}.\n\nPlease find the attached ICS file to add it to your calendar.\n\nThank you!`,
+        attachments: [
+          {
+            content: Buffer.from(icsContent).toString("base64"),
+            filename: "event.ics",
+            type: "text/calendar; method=PUBLISH",
+            disposition: "attachment",
+          },
+        ],
+      });
+      console.log("Sent calendar confirmation email to", recipient);
+    } catch (emailErr) {
+      console.error("Error sending confirmation email via SendGrid:", emailErr);
+    }
   }
 
-  // Respond with JSON indicating success and event ID
-  return NextResponse.json({ eventId: event.id, status: "scheduled" });
+  // Respond with JSON indicating success and include the event for the UI
+  return NextResponse.json({ event, status: "scheduled" });
 }

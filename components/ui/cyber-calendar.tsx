@@ -159,26 +159,33 @@ export function CyberCalendar() {
         start_time: startOfDay.toISOString(),
         end_time: endOfDay.toISOString(),
       });
-      const res = await fetch(`/api/calendar/availability?${params.toString()}`);
+      const res = await fetch(`/api/calendar/availability?${params.toString()}`, { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) {
         console.error(data.error);
         setAvailableSlots([]);
       } else {
         const busy: { start: string; end: string }[] = data.busy || [];
+        // Determine free 30-minute slots that do not overlap any busy period
+        const slotDurationMs = 30 * 60 * 1000;
         const freeDates = generateTimeSlots()
           .map(({ hours, minutes }) => {
             const dt = new Date(startOfDay);
             dt.setHours(hours, minutes, 0, 0);
             return dt;
           })
-          .filter((dt) =>
-            !busy.some((b) => {
+          .filter((dt) => {
+            // slot interval
+            const slotStart = dt;
+            const slotEnd = new Date(slotStart.getTime() + slotDurationMs);
+            // ensure no overlap with any busy interval
+            return !busy.some((b) => {
               const bStart = new Date(b.start);
               const bEnd = new Date(b.end);
-              return dt >= bStart && dt < bEnd;
-            })
-          );
+              // overlap if slotStart < busyEnd and slotEnd > busyStart
+              return slotStart < bEnd && slotEnd > bStart;
+            });
+          });
         setAvailableSlots(freeDates.map((dt) => ({ start: dt.toISOString() })));
       }
     } catch (err) {
