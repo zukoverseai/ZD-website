@@ -1,6 +1,6 @@
 "use client";  // mark this module as a client component
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Clock, CalendarIcon } from "lucide-react";
 
@@ -125,6 +125,74 @@ export function CyberCalendar() {
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [name, setName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [scheduledEvent, setScheduledEvent] = useState<any | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<{ start: string }[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+
+  // Scroll to the Contact Us section when an appointment is confirmed
+  useEffect(() => {
+    if (scheduledEvent) {
+      const contactEl = document.getElementById('contact');
+      if (contactEl) {
+        contactEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  }, [scheduledEvent]);
+
+  // Fetch available slots using Google Calendar freebusy API whenever the selected date changes, with polling
+  const fetchAvailability = useCallback(async () => {
+    if (!selectedDate) {
+      setAvailableSlots([]);
+      setIsLoadingSlots(false);
+      return;
+    }
+    setIsLoadingSlots(true);
+    const startOfDay = new Date(selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    try {
+      const params = new URLSearchParams({
+        start_time: startOfDay.toISOString(),
+        end_time: endOfDay.toISOString(),
+      });
+      const res = await fetch(`/api/calendar/availability?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) {
+        console.error(data.error);
+        setAvailableSlots([]);
+      } else {
+        const busy: { start: string; end: string }[] = data.busy || [];
+        const freeDates = generateTimeSlots()
+          .map(({ hours, minutes }) => {
+            const dt = new Date(startOfDay);
+            dt.setHours(hours, minutes, 0, 0);
+            return dt;
+          })
+          .filter((dt) =>
+            !busy.some((b) => {
+              const bStart = new Date(b.start);
+              const bEnd = new Date(b.end);
+              return dt >= bStart && dt < bEnd;
+            })
+          );
+        setAvailableSlots(freeDates.map((dt) => ({ start: dt.toISOString() })));
+      }
+    } catch (err) {
+      console.error(err);
+      setAvailableSlots([]);
+    } finally {
+      setIsLoadingSlots(false);
+    }
+  }, [selectedDate]);
+  useEffect(() => {
+    fetchAvailability();
+    const intervalId = setInterval(fetchAvailability, 60_000);
+    return () => clearInterval(intervalId);
+  }, [fetchAvailability]);
 
   // Get days in month
   const getDaysInMonth = (month: number, year: number): number => {
@@ -178,6 +246,7 @@ export function CyberCalendar() {
   const handleDateSelect = (day: number) => {
     const selected = new Date(currentYear, currentMonth, day);
     setSelectedDate(selected);
+    setIsLoadingSlots(true);
     setShowTimeSelector(true);
     setSelectedTime(null);
   };
@@ -206,6 +275,13 @@ export function CyberCalendar() {
     );
   };
 
+  // Check if a date is in the past (before today)
+  const isPast = (day: number): boolean => {
+    const cellDate = new Date(currentYear, currentMonth, day);
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return cellDate < todayStart;
+  };
+
   // Display month and year
   const monthYearDisplay = () => {
     const months = [
@@ -225,7 +301,64 @@ export function CyberCalendar() {
     return `${months[currentMonth]} ${currentYear}`;
   };
 
-  const timeSlots = generateTimeSlots();
+  // Handler to submit the appointment to Google Calendar
+  const handleConfirm = async () => {
+    setIsSubmitting(true);
+    // Validate required fields
+    if (!name || !email) {
+      alert("Please enter your name and email.");
+      setIsSubmitting(false);
+      return;
+    }
+    if (!selectedDate || !selectedTime) {
+      alert("Please select a date and time.");
+      setIsSubmitting(false);
+      return;
+    }
+    const start = new Date(selectedDate);
+    start.setHours(selectedTime.hours, selectedTime.minutes, 0, 0);
+    const isoStart = start.toISOString();
+    try {
+      const response = await fetch("/api/calendar/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          start_time: isoStart,
+          summary: `Consultation with ${name}`,
+          attendees: [{ email, displayName: name }],
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        console.error(data.error);
+        alert("Error scheduling appointment.");
+        setIsSubmitting(false);
+      } else {
+        // Remove the booked slot immediately
+        setAvailableSlots(prev => prev.filter(slot => slot.start !== isoStart));
+        // Store the event and show custom confirmation UI
+        setScheduledEvent(data.event);
+        setIsSubmitting(false);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Network error, please try again.");
+      setIsSubmitting(false);
+    }
+  };
+
+  if (scheduledEvent) {
+    const eventStart = new Date(scheduledEvent.start.dateTime);
+    return (
+      <div className="flex flex-col items-center justify-center p-8 space-y-4 bg-[#0a0a12] text-white">
+        <h2 className="text-2xl font-bold">🎉 Appointment Confirmed!</h2>
+
+        <p className="font-mono">{formatDate(eventStart)} at {formatTime(eventStart.getHours(), eventStart.getMinutes())}</p>
+        <p>We're excited to meet you! 😊</p>
+        <p className="text-sm text-gray-400">Check your inbox/spam for details.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col space-y-6">
@@ -271,17 +404,23 @@ export function CyberCalendar() {
           {generateCalendarDays().map((day, idx) => (
             <div key={idx} className="aspect-square relative">
               {day !== null ? (
-                <button
-                  onClick={() => handleDateSelect(day)}
-                  className={`relative w-full h-full flex items-center justify-center text-sm rounded-md transition-all ${isSelected(day)
-                    ? "bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black font-medium shadow-[0_0_15px_rgba(62,206,247,0.5)]"
-                    : isToday(day)
-                      ? "bg-[#1a1a2e] text-white border border-[#3ecef7] shadow-[0_0_8px_rgba(62,206,247,0.3)]"
-                      : "bg-[#0f0f1a] text-gray-300 border border-[#1a1a2e] hover:border-[#3ecef7]/50 hover:bg-[#0a0a12]/80"
-                    }`}
-                >
-                  {day}
-                </button>
+                isPast(day) ? (
+                  <div className="relative w-full h-full flex items-center justify-center text-sm text-gray-500 line-through">
+                    {day}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleDateSelect(day)}
+                    className={`relative w-full h-full flex items-center justify-center text-sm rounded-md transition-all ${isSelected(day)
+                      ? "bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black font-medium shadow-[0_0_15px_rgba(62,206,247,0.5)]"
+                      : isToday(day)
+                        ? "bg-[#1a1a2e] text-white border border-[#3ecef7] shadow-[0_0_8px_rgba(62,206,247,0.3)]"
+                        : "bg-[#0f0f1a] text-gray-300 border border-[#1a1a2e] hover:border-[#3ecef7]/50 hover:bg-[#0a0a12]/80"
+                      }`}
+                  >
+                    {day}
+                  </button>
+                )
               ) : (
                 <div className="w-full h-full"></div>
               )}
@@ -336,20 +475,36 @@ export function CyberCalendar() {
               <h4 className="text-sm font-medium text-white">Select a time</h4>
             </div>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-3 lg:grid-cols-4">
-              {timeSlots.map((slot, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleTimeSelect(slot.hours, slot.minutes)}
-                  className={`${selectedTime &&
-                    selectedTime.hours === slot.hours &&
-                    selectedTime.minutes === slot.minutes
-                    ? "bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black"
-                    : "bg-[#1a1a2e] text-white hover:bg-[#252542]"
-                    } py-2 px-4 rounded-md transition-colors`}
-                >
-                  {formatTime(slot.hours, slot.minutes)}
-                </button>
-              ))}
+              {isLoadingSlots ? (
+                <p className="col-span-full text-center text-gray-400">
+                  Checking available times...
+                </p>
+              ) : availableSlots.filter(slot => new Date(slot.start) > new Date()).length === 0 ? (
+                <p className="col-span-full text-center text-gray-400">
+                  No available times for this date.
+                </p>
+              ) : (
+                availableSlots.filter(slot => new Date(slot.start) > new Date()).map((slot) => {
+                  const date = new Date(slot.start);
+                  const hours = date.getHours();
+                  const minutes = date.getMinutes();
+                  const label = formatTime(hours, minutes);
+                  return (
+                    <button
+                      key={slot.start}
+                      onClick={() => handleTimeSelect(hours, minutes)}
+                      className={`${selectedTime &&
+                        selectedTime.hours === hours &&
+                        selectedTime.minutes === minutes
+                        ? "bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black"
+                        : "bg-[#1a1a2e] text-white hover:bg-[#252542]"
+                        } py-2 px-4 rounded-md transition-colors`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </motion.div>
         )}
@@ -380,7 +535,14 @@ export function CyberCalendar() {
                 className="w-full p-2 rounded bg-[#1a1a2e] border border-[#3ecef7] text-white"
               />
             </div>
-            <button className="w-full py-3 px-4 rounded-md bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black font-medium shadow-[0_0_15px_rgba(62,206,247,0.3)] hover:shadow-[0_0_20px_rgba(62,206,247,0.5)] transition-all">
+            <button
+              onClick={handleConfirm}
+              disabled={isSubmitting}
+              className={`${isSubmitting
+                ? "w-full py-3 px-4 rounded-md bg-gray-400 text-gray-700 cursor-not-allowed transition-all"
+                : "w-full py-3 px-4 rounded-md bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] text-black font-medium shadow-[0_0_15px_rgba(62,206,247,0.3)] hover:shadow-[0_0_20px_rgba(62,206,247,0.5)] transition-all"
+                }`}
+            >
               Confirm Appointment
             </button>
           </motion.div>

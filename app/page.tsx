@@ -339,7 +339,7 @@ export default function Home() {
             <motion.div variants={itemVariants}>
               <ProjectCard
                 title="MASA Reset System"
-                description="Landing page for a specialized fitness platform for Arabs integrating tailored workout plans, customized diets, and community accountability via private WhatsApp groups and 1-on-1 support."
+                description="Web app for a specialized fitness platform for Arabs integrating tailored workout plans, customized diets, and community accountability via private WhatsApp groups and 1-on-1 support."
                 tags={[
                   "HTML5/CSS3",
 
@@ -365,7 +365,7 @@ export default function Home() {
             <motion.div variants={itemVariants}>
               <ProjectCard
                 title="Eco-Friendly Cleaning Website"
-                description="Landing page for an eco-friendly residential cleaning website offering move-in/move-out and post-construction cleans with a 100% satisfaction guarantee."
+                description="Web app for an eco-friendly residential cleaning website offering move-in/move-out and post-construction cleans with a 100% satisfaction guarantee."
                 tags={[
                   "Next.js 15 (App Router)",
                   "React 18",
@@ -409,7 +409,7 @@ export default function Home() {
                   Us
                 </span>
               </h2>
-      
+
             </div>
           </motion.div>
 
