@@ -362,7 +362,7 @@ export function CyberCalendar() {
 
         <p className="font-mono">{formatDate(eventStart)} at {formatTime(eventStart.getHours(), eventStart.getMinutes())}</p>
         <p>We're excited to meet you! 😊</p>
-        <p className="text-sm text-gray-400">Check your inbox/spam for details.</p>
+        <p className="text-sm text-gray-400">{`We'll reach out to you ;)`}</p>
       </div>
     );
   }
