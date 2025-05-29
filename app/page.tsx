@@ -380,9 +380,9 @@ export default function Home() {
             </motion.div>
           </motion.div>
 
-          <motion.div variants={itemVariants} className="flex justify-center">
+          { /* <motion.div variants={itemVariants} className="flex justify-center">
             <NeonButton color="cyan">View All Projects</NeonButton>
-          </motion.div>
+          </motion.div> */ }
         </div>
       </section>
 
