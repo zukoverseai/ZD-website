@@ -8,9 +8,9 @@ const inter = Inter({ subsets: ["latin"] });
 
 // SEO metadata for Next.js
 export const metadata: Metadata = {
-  title: "HOB Studio - Haus of Banstead Interior Design",
-  description: "Where architectural precision meets artistic vision. Crafting spaces that transcend the ordinary.",
-  keywords: "interior design, luxury interiors, home design, commercial design, Banstead, HOB Studio",
+  title: "Zoftware Development - Anything is possible with Zoftware",
+  description: "Zoftware Development is a software development company that provides software development services to businesses.",
+  keywords: "software development, software development services, software development company, software development agency, software development firm, software development services company, software development services agency, software development services firm",
   generator: "v0.dev",
 };
 
