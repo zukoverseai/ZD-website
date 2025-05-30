@@ -1,7 +1,6 @@
+export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { SignJWT, importPKCS8 } from "jose";
-
-export const runtime = "edge";
 
 // If `globalThis.atob` exists (Edge/browser), use it.
 // Otherwise (Node), define it via Buffer.
