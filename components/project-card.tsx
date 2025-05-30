@@ -89,16 +89,18 @@ export function ProjectCard({
         <div className="absolute -inset-0.5 bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] opacity-0 blur transition duration-300 group-hover:opacity-70"></div>
 
         <div className="relative h-full rounded-sm bg-[#0f0f1a] p-1">
-          <div className="aspect-video w-full overflow-hidden">
-            <Image
-              src={imageUrl || "/placeholder.svg"}
-              alt={title}
-              width={600}
-              height={400}
-              className="h-full w-full object-cover transition-transform duration-500 "
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f1a] via-transparent to-transparent"></div>
-          </div>
+          <Link href={ctaUrl || "#"} className="block relative" target="_blank" rel="noopener noreferrer">
+            <div className="aspect-video w-full overflow-hidden">
+              <Image
+                src={imageUrl || "/placeholder.svg"}
+                alt={title}
+                width={600}
+                height={400}
+                className="h-full w-full object-cover transition-transform duration-500 "
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f1a] via-transparent to-transparent"></div>
+            </div>
+          </Link>
 
           <div className="relative z-10 space-y-3 p-4" onWheel={handleWheel}>
             <div className="flex items-center justify-between">
@@ -111,6 +113,7 @@ export function ProjectCard({
               <Link
                 href={ctaUrl || "#"}
                 className="group inline-flex items-center text-sm font-medium text-[#7deb7d] transition-colors hover:text-[#5bc95b]"
+                target="_blank" rel="noopener noreferrer"
               >
                 <span>See for yourself</span>
                 <svg

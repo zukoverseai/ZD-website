@@ -1,10 +1,52 @@
 import { NextResponse } from "next/server";
-import { google } from "googleapis";
+import { SignJWT, importPKCS8 } from "jose";
+
+export const runtime = "edge";
+
+// If `globalThis.atob` exists (Edge/browser), use it.
+// Otherwise (Node), define it via Buffer.
+const atob =
+  globalThis.atob ??
+  ((b64: string) => Buffer.from(b64, "base64").toString("utf8"));
+
+async function getAccessToken(): Promise<string> {
+  const sa = JSON.parse(atob(process.env.GOOGLE_SERVICE_ACCOUNT_KEY!));
+  const alg = "RS256";
+  const now = Math.floor(Date.now() / 1000);
+
+  const jwt = await new SignJWT({
+    scope: "https://www.googleapis.com/auth/calendar",
+  })
+    .setProtectedHeader({ alg, typ: "JWT" })
+    .setIssuedAt(now)
+    .setExpirationTime(now + 3600)
+    .setIssuer(sa.client_email)
+    .setSubject(process.env.CALENDAR_ID!)
+    .setAudience("https://oauth2.googleapis.com/token")
+    .sign(await importPKCS8(sa.private_key, alg));
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    const err = await tokenRes.json();
+    throw new Error(`OAuth error: ${err.error_description || err.error}`);
+  }
+
+  const { access_token } = await tokenRes.json();
+  return access_token;
+}
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const start = searchParams.get("start_time");
-  const end = searchParams.get("end_time");
+  const url = new URL(req.url);
+  const start = url.searchParams.get("start_time");
+  const end = url.searchParams.get("end_time");
   if (!start || !end) {
     return NextResponse.json(
       { error: "Missing start_time or end_time" },
@@ -12,44 +54,33 @@ export async function GET(req: Request) {
     );
   }
 
-  // Parse Base64-encoded service account key
-  const encodedKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (!encodedKey) {
-    throw new Error("Missing GOOGLE_SERVICE_ACCOUNT_KEY in environment");
-  }
-  const keyJson = Buffer.from(encodedKey, "base64").toString("utf8");
-  const keyObj = JSON.parse(keyJson) as {
-    client_email: string;
-    private_key: string;
-  };
-  // Log which service account email we're using for availability queries
-  console.log("Using Service Account Email:", keyObj.client_email);
-
-  // Authenticate with Google using JWT service account
-  const client = new google.auth.JWT(
-    keyObj.client_email,
-    undefined,
-    keyObj.private_key,
-    ["https://www.googleapis.com/auth/calendar"],
-    "support@zukoverse.ai"
-  );
-  await client.authorize();
-  const calendar = google.calendar({ version: "v3", auth: client });
-
   try {
-    // Query busy times for the given window
-    const response = await calendar.freebusy.query({
-      requestBody: {
-        timeMin: start,
-        timeMax: end,
-        items: [{ id: process.env.CALENDAR_ID! }],
-      },
-    });
-    const busy =
-      response.data.calendars?.[process.env.CALENDAR_ID!]?.busy || [];
+    const token = await getAccessToken();
+    const fbRes = await fetch(
+      "https://www.googleapis.com/calendar/v3/freeBusy",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          timeMin: start,
+          timeMax: end,
+          items: [{ id: process.env.CALENDAR_ID }],
+        }),
+      }
+    );
+
+    if (!fbRes.ok) {
+      const err = await fbRes.json();
+      return NextResponse.json({ error: err }, { status: fbRes.status });
+    }
+
+    const fbJson = await fbRes.json();
+    const busy = fbJson.calendars?.[process.env.CALENDAR_ID!]?.busy || [];
     return NextResponse.json({ busy });
-  } catch (error: any) {
-    console.error("Google Calendar freebusy error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

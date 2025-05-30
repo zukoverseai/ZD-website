@@ -559,7 +559,7 @@ export default function Home() {
 
             <div className="flex gap-4">
               {/* Facebook */}
-              {/* <Link href="#" className="group relative">
+              <Link href="#" className="group relative">
                 <div className="absolute -inset-0.5 rounded-full bg-gradient-to-r from-[#3ecef7] to-[#7deb7d] opacity-0 blur transition duration-300 group-hover:opacity-70"></div>
                 <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[#0f0f1a] text-gray-400 transition-colors duration-300 group-hover:text-white">
                   <svg
@@ -577,10 +577,10 @@ export default function Home() {
                     <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
                   </svg>
                 </div>
-              </Link> */}
+              </Link>
               {/* X */}
               <Link
-                href="https://x.com/zoftwared"
+                href="https://x.com/mishaelwilcox"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group relative"

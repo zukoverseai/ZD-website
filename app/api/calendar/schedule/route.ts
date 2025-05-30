@@ -1,10 +1,46 @@
 import { NextResponse } from "next/server";
-// Import Google APIs client for interacting with Calendar
-import { google } from "googleapis";
-// Import SendGrid mail client for sending emails
-import sgMail from "@sendgrid/mail";
-// Import randomUUID for generating unique IDs for ICS events
-import { randomUUID } from "crypto";
+import { SignJWT, importPKCS8 } from "jose";
+
+export const runtime = "edge";
+
+// If `globalThis.atob` exists (Edge/browser), use it.
+// Otherwise (Node), define it via Buffer.
+const atob =
+  globalThis.atob ??
+  ((b64: string) => Buffer.from(b64, "base64").toString("utf8"));
+
+// helper to exchange service-account JWT for Google OAuth2 access token
+async function getAccessToken(): Promise<string> {
+  const sa = JSON.parse(atob(process.env.GOOGLE_SERVICE_ACCOUNT_KEY!));
+  const alg = "RS256";
+  const now = Math.floor(Date.now() / 1000);
+
+  const jwt = await new SignJWT({
+    scope: "https://www.googleapis.com/auth/calendar",
+  })
+    .setProtectedHeader({ alg, typ: "JWT" })
+    .setIssuedAt(now)
+    .setExpirationTime(now + 3600)
+    .setIssuer(sa.client_email)
+    .setSubject(process.env.CALENDAR_ID!)
+    .setAudience("https://oauth2.googleapis.com/token")
+    .sign(await importPKCS8(sa.private_key, alg));
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+  if (!tokenRes.ok) {
+    const err = await tokenRes.json();
+    throw new Error(`OAuth error: ${err.error_description || err.error}`);
+  }
+  const { access_token } = await tokenRes.json();
+  return access_token;
+}
 
 /**
  * POST /api/calendar/schedule
@@ -28,132 +64,36 @@ export async function POST(req: Request) {
   // Default duration: 30 minutes
   const endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
 
-  // Load and validate Google service account credentials
-  const encodedKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (!encodedKey) {
-    throw new Error("Missing GOOGLE_SERVICE_ACCOUNT_KEY in environment");
-  }
-  // Decode Base64 key and parse JSON
-  const keyJson = Buffer.from(encodedKey, "base64").toString("utf8");
-  const keyObj = JSON.parse(keyJson) as {
-    client_email: string;
-    private_key: string;
-  };
-  // Log which service account email we're using
-  console.log("Using Service Account Email:", keyObj.client_email);
-
-  // Create JWT auth client for Google API
-  const client = new google.auth.JWT(
-    keyObj.client_email,
-    undefined,
-    keyObj.private_key,
-    ["https://www.googleapis.com/auth/calendar"],
-    "support@zukoverse.ai"
-  );
-  // Authorize client
-  await client.authorize();
-  // Initialize Google Calendar API
-  const calendar = google.calendar({ version: "v3", auth: client });
-
-  // Insert event into calendar (no attendees => no invite emails)
-  console.log("Scheduling event to Google Calendar:", {
-    calendarId: process.env.CALENDAR_ID,
-    summary,
-    start: startDate.toISOString(),
-    end: endDate.toISOString(),
-  });
-  let insertResponse;
+  // Call Calendar API directly using service-account JWT
   try {
-    insertResponse = await calendar.events.insert({
-      calendarId: process.env.CALENDAR_ID!,
-      requestBody: {
-        summary,
-        // Include booker info in description for easy identification
-        description: `${summary}\n\nBooked by: ${
-          attendees?.[0]?.displayName || ""
-        } <${attendees?.[0]?.email || ""}>`,
-        start: { dateTime: startDate.toISOString() },
-        end: { dateTime: endDate.toISOString() },
-      },
-    });
-    console.log("Google Calendar insertResponse.data:", insertResponse.data);
-  } catch (err: any) {
-    console.error("Error inserting event into Google Calendar:", err);
-    // Log detailed request and response info for debugging
-    if (err.config) {
-      console.error("Google API request config:", err.config);
+    const token = await getAccessToken();
+    const evRes = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+        process.env.CALENDAR_ID!
+      )}/events?sendUpdates=none`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          summary,
+          description: `${summary}\n\nBooked by: ${
+            attendees?.[0]?.displayName || ""
+          } <${attendees?.[0]?.email || ""}>`,
+          start: { dateTime: startDate.toISOString() },
+          end: { dateTime: endDate.toISOString() },
+        }),
+      }
+    );
+    if (!evRes.ok) {
+      const err = await evRes.json();
+      return NextResponse.json({ error: err }, { status: evRes.status });
     }
-    if (err.response) {
-      console.error("Google API response status:", err.response.status);
-      console.error("Google API response data:", err.response.data);
-    }
-    throw err;
+    const event = await evRes.json();
+    return NextResponse.json({ status: "scheduled", event });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
-  // Extract created event
-  const event = insertResponse.data;
-
-  // Configure SendGrid client (email sending commented out; emails will be sent manually)
-  /*
-  const { SENDGRID_API_KEY, SENDGRID_FROM } = process.env;
-  if (!SENDGRID_API_KEY || !SENDGRID_FROM) {
-    throw new Error("Missing SENDGRID_API_KEY or SENDGRID_FROM in environment");
-  }
-  sgMail.setApiKey(SENDGRID_API_KEY);
-  */
-
-  // Helper to format dates in ICS format: YYYYMMDDTHHMMSSZ
-  function toICSDate(date: Date) {
-    return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-  }
-
-  // Generate unique UID for ICS event
-  const uid = randomUUID();
-
-  // Build ICS file content lines
-  const icsLines = [
-    "BEGIN:VCALENDAR",
-    "METHOD:PUBLISH",
-    "VERSION:2.0",
-    "PRODID:-//YourCompany//YourApp//EN",
-    "BEGIN:VEVENT",
-    `UID:${uid}`,
-    `DTSTAMP:${toICSDate(new Date())}`,
-    `DTSTART:${toICSDate(startDate)}`,
-    `DTEND:${toICSDate(endDate)}`,
-    `SUMMARY:${summary}`,
-    "END:VEVENT",
-    "END:VCALENDAR",
-  ];
-  // Join lines with CRLF as per RFC5545
-  const icsContent = icsLines.join("\r\n");
-
-  // Send confirmation email with ICS attachment if an attendee exists (commented out; send manually)
-  /*
-  const recipient =
-    attendees && attendees.length > 0 ? attendees[0].email : null;
-  if (recipient) {
-    try {
-      await sgMail.send({
-        from: SENDGRID_FROM,
-        to: recipient,
-        subject: "Your Appointment is Confirmed",
-        text: `Hi ${attendees[0].displayName || ""},\n\nYour appointment "${summary}" is confirmed for ${startDate.toLocaleString()}.\n\nPlease find the attached ICS file to add it to your calendar.\n\nThank you!`,
-        attachments: [
-          {
-            content: Buffer.from(icsContent).toString("base64"),
-            filename: "event.ics",
-            type: "text/calendar; method=PUBLISH",
-            disposition: "attachment",
-          },
-        ],
-      });
-      console.log("Sent calendar confirmation email to", recipient);
-    } catch (emailErr) {
-      console.error("Error sending confirmation email via SendGrid:", emailErr);
-    }
-  }
-  */
-
-  // Respond with JSON indicating success and include the event for the UI
-  return NextResponse.json({ event, status: "scheduled" });
 }
