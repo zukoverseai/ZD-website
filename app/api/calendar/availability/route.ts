@@ -81,6 +81,10 @@ export async function GET(req: Request) {
     const busy = fbJson.calendars?.[process.env.CALENDAR_ID!]?.busy || [];
     return NextResponse.json({ busy });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    console.error("Availability error:", e);
+    return NextResponse.json(
+      { error: e.message, stack: e.stack },
+      { status: 500 }
+    );
   }
 }
