@@ -29,7 +29,7 @@ async function getAccessToken(): Promise<string> {
     .setIssuedAt(now)
     .setExpirationTime(now + 3600)
     .setIssuer(sa.client_email)
-    .setSubject(process.env.CALENDAR_ID!)
+    .setSubject("support@zukoverse.ai")
     .setAudience("https://oauth2.googleapis.com/token")
     .sign(cryptoKey);
 
