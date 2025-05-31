@@ -1,38 +1,73 @@
 export const runtime = "edge";
 
 import { NextResponse } from "next/server";
-import { SignJWT, importPKCS8, exportJWK } from "jose";
+import { importPKCS8 } from "jose";
 
-// If `globalThis.atob` exists (Edge/browser), use it.
-// Otherwise (Node), define it via Buffer.
+// Define atob for environments where it might not exist (though Edge should have it)
 const atob =
   globalThis.atob ??
   ((b64: string) => Buffer.from(b64, "base64").toString("utf8"));
 
+// Base64url encoding function
+const btoaUrl = (str: string) => {
+  const buffer = new TextEncoder().encode(str);
+  let binary = "";
+  for (const byte of buffer) {
+    binary += String.fromCharCode(byte);
+  }
+  return globalThis
+    .btoa(binary)
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+};
+
 async function getAccessToken(): Promise<string> {
-  // ── 1) Parse service-account JSON (raw or Base64-encoded)
+  // Parse the service account key (raw JSON or base64-encoded)
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY!;
   const sa = JSON.parse(raw.startsWith("{") ? raw : atob(raw));
   const alg = "RS256";
   const now = Math.floor(Date.now() / 1000);
 
-  // ── 2) Import private key (PEM) → CryptoKey
-  const pem = sa.private_key.replace(/\\n/g, "\n");
-  const cryptoKey = await importPKCS8(pem, alg, { extractable: true });
-  // ── 3) Export CryptoKey → JWK
-  const jwk = await exportJWK(cryptoKey);
-  // ── 4) Build and sign the JWT using the JWK
-  const jwt = await new SignJWT({
-    scope: "https://www.googleapis.com/auth/calendar",
-  })
-    .setProtectedHeader({ alg, typ: "JWT" })
-    .setIssuedAt(now)
-    .setExpirationTime(now + 3600)
-    .setIssuer(sa.client_email)
-    .setSubject("support@zukoverse.ai")
-    .setAudience("https://oauth2.googleapis.com/token")
-    .sign(cryptoKey);
+  // Import the private key from PEM format
+  const pem = sa.private_key; // Use as-is, assuming it has proper newlines
+  const cryptoKey = await importPKCS8(pem, alg);
 
+  // JWT Header
+  const header = {
+    alg: "RS256",
+    typ: "JWT",
+  };
+
+  // JWT Payload (sub is the impersonated user's email, same as CALENDAR_ID)
+  const payload = {
+    scope: "https://www.googleapis.com/auth/calendar",
+    iss: sa.client_email,
+    sub: process.env.CALENDAR_ID, // Email of the user to impersonate
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600, // 1 hour expiration
+  };
+
+  // Encode header and payload to base64url
+  const encodedHeader = btoaUrl(JSON.stringify(header));
+  const encodedPayload = btoaUrl(JSON.stringify(payload));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+  // Sign using Web Crypto API
+  const signature = await crypto.subtle.sign(
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    cryptoKey,
+    new TextEncoder().encode(signingInput)
+  );
+
+  // Convert signature to base64url
+  const encodedSignature = btoaUrl(
+    String.fromCharCode(...new Uint8Array(signature))
+  );
+  const jwt = `${signingInput}.${encodedSignature}`;
+
+  // Exchange JWT for access token
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -55,6 +90,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const start = url.searchParams.get("start_time");
   const end = url.searchParams.get("end_time");
+
   if (!start || !end) {
     return NextResponse.json(
       { error: "Missing start_time or end_time" },
