@@ -1,7 +1,7 @@
 export const runtime = "edge";
 
 import { NextResponse } from "next/server";
-import { SignJWT, importPKCS8 } from "jose";
+import { SignJWT, importPKCS8, exportJWK } from "jose";
 
 // If `globalThis.atob` exists (Edge/browser), use it.
 // Otherwise (Node), define it via Buffer.
@@ -10,10 +10,18 @@ const atob =
   ((b64: string) => Buffer.from(b64, "base64").toString("utf8"));
 
 async function getAccessToken(): Promise<string> {
-  const sa = JSON.parse(atob(process.env.GOOGLE_SERVICE_ACCOUNT_KEY!));
+  // ── 1) Parse service-account JSON (raw or Base64-encoded)
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY!;
+  const sa = JSON.parse(raw.startsWith("{") ? raw : atob(raw));
   const alg = "RS256";
   const now = Math.floor(Date.now() / 1000);
 
+  // ── 2) Import private key (PEM) → CryptoKey
+  const pem = sa.private_key.replace(/\\n/g, "\n");
+  const cryptoKey = await importPKCS8(pem, alg, { extractable: true });
+  // ── 3) Export CryptoKey → JWK
+  const jwk = await exportJWK(cryptoKey);
+  // ── 4) Build and sign the JWT using the JWK
   const jwt = await new SignJWT({
     scope: "https://www.googleapis.com/auth/calendar",
   })
@@ -23,7 +31,7 @@ async function getAccessToken(): Promise<string> {
     .setIssuer(sa.client_email)
     .setSubject(process.env.CALENDAR_ID!)
     .setAudience("https://oauth2.googleapis.com/token")
-    .sign(await importPKCS8(sa.private_key, alg));
+    .sign(jwk);
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",

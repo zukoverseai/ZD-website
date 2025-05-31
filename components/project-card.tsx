@@ -90,16 +90,16 @@ export function ProjectCard({
 
         <div className="relative h-full rounded-sm bg-[#0f0f1a] p-1">
           <Link href={ctaUrl || "#"} className="block relative" target="_blank" rel="noopener noreferrer">
-            <div className="aspect-video w-full overflow-hidden">
-              <Image
-                src={imageUrl || "/placeholder.svg"}
-                alt={title}
-                width={600}
-                height={400}
-                className="h-full w-full object-cover transition-transform duration-500 "
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f1a] via-transparent to-transparent"></div>
-            </div>
+          <div className="aspect-video w-full overflow-hidden">
+            <Image
+              src={imageUrl || "/placeholder.svg"}
+              alt={title}
+              width={600}
+              height={400}
+              className="h-full w-full object-cover transition-transform duration-500 "
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f1a] via-transparent to-transparent"></div>
+          </div>
           </Link>
 
           <div className="relative z-10 space-y-3 p-4" onWheel={handleWheel}>
