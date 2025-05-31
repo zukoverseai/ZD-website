@@ -31,7 +31,7 @@ async function getAccessToken(): Promise<string> {
     .setIssuer(sa.client_email)
     .setSubject(process.env.CALENDAR_ID!)
     .setAudience("https://oauth2.googleapis.com/token")
-    .sign(jwk);
+    .sign(cryptoKey);
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
